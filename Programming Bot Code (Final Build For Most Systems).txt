@@ -1,0 +1,518 @@
+package frc.robot;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+import com.kauailabs.navx.frc.AHRS;
+
+import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.wpilibj.CameraServer;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.I2C;
+import edu.wpi.first.wpilibj.IterativeRobot;
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.I2C.Port;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
+public class Robot extends IterativeRobot {
+  private static final String kDefaultMode = "Normal Mode";
+  private static final String kCustomMode = "Debug Mode";
+  private String m_autoSelected;
+  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+
+
+
+
+  CameraServer cs = CameraServer.getInstance();
+  
+  REVDigitBoard Digit = new REVDigitBoard();
+
+  Joystick stick = new Joystick(0);
+
+  WPI_TalonSRX LeftMotor = new WPI_TalonSRX(2);
+  WPI_TalonSRX RightMotor = new WPI_TalonSRX(1);
+  WPI_TalonSRX LiftMotor = new WPI_TalonSRX(0);
+  WPI_TalonSRX AngleMotor = new WPI_TalonSRX(3);
+
+  AnalogInput LeftSensor = new AnalogInput(0);
+  AnalogInput MiddleSensor = new AnalogInput(1);
+  AnalogInput RightSensor = new AnalogInput(2);
+  AnalogInput UltraSonic = new AnalogInput(3);
+
+  DigitalInput Magnet = new DigitalInput(3);
+
+  DifferentialDrive drive = new DifferentialDrive(LeftMotor, RightMotor);
+
+  double left_max = 1.95;
+  double left_min = 0.53;
+  double middle_max = 2.4;
+  double middle_min = 0.63;
+  double right_max = 1.56;
+  double right_min = 0.36;
+
+  double left_value = 0.0;
+  double middle_value = 0.0;
+  double right_value = 0.0;
+
+  double sensor_min = 0.40;
+  double sensor_max = 1.82;
+
+  double left_speed = 0.0;
+  double right_speed = 0.0;
+  double p_speed;
+
+  int Lift_Level = 0;
+  int Driver_Level_Selection = 0;
+  boolean Button_Release = true;
+  boolean Check_Point = false;
+
+  boolean left_turn;
+  boolean right_turn;
+  boolean Climb_Time = false;
+
+
+
+  @Override
+  public void robotInit() {
+    
+    cs.addAxisCamera("10.54.64.91");
+
+    // m_chooser.setDefaultOption("Normal Mode", kDefaultMode);
+    // m_chooser.addOption("Debug Mode", kCustomMode);
+    // SmartDashboard.putData("Mode Chooser", m_chooser);
+  }
+
+  @Override
+  public void robotPeriodic() {
+  
+
+    Digit.clear();
+
+    // Added a debug mode to flood smart dashboard with debug data
+    // m_autoSelected = m_chooser.getSelected();
+
+    // switch (m_autoSelected) {
+    // case kCustomMode:
+      SmartDashboard.putNumber("Left Sensor", LeftSensor.getAverageVoltage());
+      SmartDashboard.putNumber("Middle Sensor", MiddleSensor.getAverageVoltage());
+      SmartDashboard.putNumber("Right Sensor", RightSensor.getAverageVoltage());
+
+      SmartDashboard.putNumber("Left Scaled", left_value);
+      SmartDashboard.putNumber("Middle Scaled", middle_value);
+      SmartDashboard.putNumber("Right Scaled", right_value);
+
+      SmartDashboard.putNumber("Left Max", left_max);
+      SmartDashboard.putNumber("Left Min", left_min);
+      SmartDashboard.putNumber("Middle Max", middle_max);
+      SmartDashboard.putNumber("Middle Min", middle_min);
+      SmartDashboard.putNumber("Right Max", right_max);
+      SmartDashboard.putNumber("Right Min", right_min);
+
+      SmartDashboard.putNumber("Sensor Max", sensor_max);
+      SmartDashboard.putNumber("Sensor Min", sensor_min);
+      SmartDashboard.putNumber("UltraSonic cm.", (UltraSonic.getAverageVoltage() / 1024) / 2.54);
+      SmartDashboard.putNumber("UltraSonic Voltage", UltraSonic.getAverageVoltage());
+
+      SmartDashboard.putBoolean("A", Digit.getButtonA());
+      SmartDashboard.putBoolean("B", Digit.getButtonB());
+      SmartDashboard.putNumber("POt", Digit.getPot());
+      SmartDashboard.putNumber("Battery voltage", DriverStation.getInstance().getBatteryVoltage());
+
+      SmartDashboard.putData("Magentic", Magnet);
+      SmartDashboard.putNumber("Match Time", DriverStation.getInstance().getMatchTime());
+      SmartDashboard.putNumber("Level Selection", Driver_Level_Selection);
+      SmartDashboard.putNumber("Lift Level", Lift_Level);
+      SmartDashboard.putBoolean("Magnet", Magnet.get());
+      SmartDashboard.putBoolean("Button Release", Button_Release);
+      SmartDashboard.putBoolean("Climb", Climb_Time);
+
+
+    //   break;
+    // case kDefaultMode:
+    // default:
+    //   SmartDashboard.delete("Left Sensor");
+    //   SmartDashboard.delete("Middle Sensor");
+    //   SmartDashboard.delete("Right Sensor");
+    //   SmartDashboard.delete("Left Max");
+    //   SmartDashboard.delete("Left Min");
+    //   SmartDashboard.delete("Middle Min ");
+    //   SmartDashboard.delete("Right Max");
+    //   SmartDashboard.delete("Right Min");
+    
+    //   SmartDashboard.delete("Sensor Max");
+    //   SmartDashboard.delete("Sensor Min");
+    //   break;
+    // }
+
+  }
+
+  @Override
+  public void autonomousInit() {
+
+  }
+
+  @Override
+  public void autonomousPeriodic() {
+
+
+  }
+
+  @Override
+  public void teleopPeriodic() {
+    
+    // Get the proportional speed from the method
+    p_speed = proportional_speed();
+
+    // If you press button on drive based off the speed line speed.
+    if (stick.getRawButton(1) == true) {
+
+      // if line is on left sensor drive left
+      if(left_value > right_value && left_value > middle_value){
+      left_speed = (0.9 * (1 + p_speed));
+      right_speed = (0.9 * (1 - p_speed));
+      drive.tankDrive(left_speed, right_speed);
+      }
+
+      // if line is on middle sensor drive forward      
+      else if (middle_value > right_value && middle_value > left_value){
+        drive.tankDrive(0.9, 0.9);
+      }
+
+
+      // if line is on right sensor
+      else if(right_value > middle_value && right_value > middle_value){        
+        left_speed = (0.9 * (1 - p_speed));
+        right_speed = (0.9 * (1 + p_speed));
+        drive.tankDrive(left_speed, right_speed);
+      }
+    }
+
+      else{
+        drive.arcadeDrive(-stick.getY(), -stick.getX());
+      }
+
+    if(stick.getRawButton(6) && Button_Release == true && Driver_Level_Selection != 1){
+      Driver_Level_Selection++;
+      Button_Release = false;
+    }else if(stick.getRawButton(5) && Button_Release == true && Driver_Level_Selection != 0){
+      Driver_Level_Selection--;
+      Button_Release = false;
+    }else if(stick.getRawButton(6) == false && stick.getRawButton(5) == false){
+      Button_Release = true;
+    }
+    
+
+    if(Lift_Level > Driver_Level_Selection){
+      LiftMotor.set(-1.0);
+      
+      if(Magnet.get() == false && Check_Point == false){
+        Lift_Level--;
+        Check_Point = true;
+      }else if(Magnet.get() == true){
+        Check_Point = false;
+      }
+
+    }else if (Lift_Level < Driver_Level_Selection){
+      LiftMotor.set(1.0);
+
+      if(Magnet.get() == false && Check_Point == false){
+        Lift_Level++;
+        Check_Point = true;
+      }else if(Magnet.get() == true){
+        Check_Point = false;
+      }
+
+    }else if(Lift_Level == Driver_Level_Selection && Magnet.get() == false){
+      AngleMotor.set(0.0);
+    }
+
+    if(DriverStation.getInstance().getMatchTime() < 30 && Climb_Time == false){
+      Climb_Time = true;
+    }else if(DriverStation.getInstance().getMatchTime() < 30 && Climb_Time == true){
+      Climb_Time = false;
+    }
+
+    }
+
+
+  @Override
+  public void testPeriodic() {
+
+    // During test mode read the sensor voltage and set a variable to the max and mininum of the sensor
+    left_max = (LeftSensor.getAverageVoltage() > left_max) ? LeftSensor.getAverageVoltage() : left_max;
+    middle_max = (MiddleSensor.getAverageVoltage() > middle_max) ? MiddleSensor.getAverageVoltage() : middle_max;
+    right_max = (RightSensor.getAverageVoltage() > right_max) ? RightSensor.getAverageVoltage() : right_max;
+
+    left_min = (LeftSensor.getAverageVoltage() < left_min) ? LeftSensor.getAverageVoltage() : left_min;
+    middle_min = (MiddleSensor.getAverageVoltage() < middle_min) ? MiddleSensor.getAverageVoltage() : middle_min;
+    right_min = (RightSensor.getAverageVoltage() < right_min) ? RightSensor.getAverageVoltage() : right_min;
+
+    // Calculate the average max and the average min
+    // sensor_max = (left_max + middle_max + right_max) / 3;
+    // sensor_min = (left_min + middle_min + right_min) / 3;
+
+  }
+
+  double proportional_speed() {
+    double first_value = 0.0;
+    double second_value = 0.0;
+    double final_value = 0.0;
+
+
+
+    boolean middle = false;
+
+    // Calculate the scaled value of each line sensor between 0 and 1
+    left_value = (LeftSensor.getAverageVoltage() - left_min) / (left_max - left_min);
+    middle_value = (MiddleSensor.getAverageVoltage() - middle_min) / (middle_max - middle_min);
+    right_value = (RightSensor.getAverageVoltage() - right_min) / (right_max - right_min);
+
+    // Determine the largest value between the three sensors
+    if (left_value > middle_value && left_value > right_value) {
+      first_value = left_value;
+      middle = false;
+    } else if (middle_value > left_value && middle_value > right_value) {
+      first_value = middle_value;
+      middle = true;
+    } else if (right_value > left_value && right_value > middle_value) {
+      first_value = right_value;
+      middle = false;
+    }
+
+    // If the largest value was middle, see if the left value or right value is larger.
+    // If the largest value was not middle. Set the second value to the middle value.
+    if (middle) {
+      // second_value = (left_value > right_value) ? left_value : right_value;
+      if(left_value > right_value){
+        second_value = left_value;
+      } else {
+        second_value = right_value;
+      }
+    } else{
+     second_value = middle_value;
+    }
+
+    // Calculate the final value
+    final_value = (first_value - second_value) / (first_value + second_value);
+
+    // If the right value is greater than the left value invert the final calculated value
+    final_value = final_value / 0.5;
+
+    
+    return final_value;
+  }
+}
+
+////
+/////REV Digit Board Supplied Library
+////
+
+package frc.robot; // might need to change this number
+
+import edu.wpi.first.wpilibj.I2C;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.I2C.Port;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.AnalogInput;
+
+import java.util.*;
+
+public class REVDigitBoard {
+	/*
+	 * DOCUMENTATION::
+	 * 
+	 * REVDigitBoard() : constructor
+	 * void display(String str) : displays the first four characters of the string (only alpha (converted to uppercase), numbers, and spaces)
+	 * void display(double batt) : displays a decimal number (like battery voltage) in the form of 12.34 (ten-one-decimal-tenth-hundredth)
+	 * void clear() : clears the display
+	 * boolean getButtonA() : button A on the board
+	 * boolean getButtonB() : button B on the board
+	 * double getPot() : potentiometer value
+	 */
+	
+	I2C i2c;
+	DigitalInput buttonA, buttonB;
+	AnalogInput pot;
+	
+	byte[][] charreg;
+	Map charmap;
+	
+	REVDigitBoard() {
+		i2c = new I2C(Port.kMXP, 0x70);
+		buttonA = new DigitalInput(19);
+		buttonB = new DigitalInput(20);
+		pot = new AnalogInput(3);
+		
+		byte[] osc = new byte[1];
+	 	byte[] blink = new byte[1];
+	 	byte[] bright = new byte[1];
+	 	osc[0] = (byte)0x21;
+	 	blink[0] = (byte)0x81;
+	 	bright[0] = (byte)0xEF;
+
+		i2c.writeBulk(osc);
+		Timer.delay(.01);
+		i2c.writeBulk(bright);
+		Timer.delay(.01);
+		//i2c.writeBulk(blink);
+		Timer.delay(.01);
+		
+		charreg = new byte[37][2]; //charreg is short for character registry
+		charmap = new HashMap<Character, Integer>(); 
+		
+		charreg[0][0] = (byte)0b00111111; charreg[9][1] = (byte)0b00000000; //0
+		charmap.put('0',0);
+		charreg[1][0] = (byte)0b00000110; charreg[0][1] = (byte)0b00000000; //1
+		charmap.put('1',1);
+	 	charreg[2][0] = (byte)0b11011011; charreg[1][1] = (byte)0b00000000; //2
+		charmap.put('2',2);
+	 	charreg[3][0] = (byte)0b11001111; charreg[2][1] = (byte)0b00000000; //3
+		charmap.put('3',3);
+	 	charreg[4][0] = (byte)0b11100110; charreg[3][1] = (byte)0b00000000; //4
+		charmap.put('4',4);
+	 	charreg[5][0] = (byte)0b11101101; charreg[4][1] = (byte)0b00000000; //5
+		charmap.put('5',5);
+	 	charreg[6][0] = (byte)0b11111101; charreg[5][1] = (byte)0b00000000; //6
+		charmap.put('6',6);
+	 	charreg[7][0] = (byte)0b00000111; charreg[6][1] = (byte)0b00000000; //7
+		charmap.put('7',7);
+	 	charreg[8][0] = (byte)0b11111111; charreg[7][1] = (byte)0b00000000; //8
+		charmap.put('8',8);
+	 	charreg[9][0] = (byte)0b11101111; charreg[8][1] = (byte)0b00000000; //9
+		charmap.put('9',9);
+
+	 	charreg[10][0] = (byte)0b11110111; charreg[10][1] = (byte)0b00000000; //A
+		charmap.put('A',10);
+	 	charreg[11][0] = (byte)0b10001111; charreg[11][1] = (byte)0b00010010; //B
+		charmap.put('B',11);
+	 	charreg[12][0] = (byte)0b00111001; charreg[12][1] = (byte)0b00000000; //C
+		charmap.put('C',12);
+	 	charreg[13][0] = (byte)0b00001111; charreg[13][1] = (byte)0b00010010; //D
+		charmap.put('D',13);
+	 	charreg[14][0] = (byte)0b11111001; charreg[14][1] = (byte)0b00000000; //E
+		charmap.put('E',14);
+	 	charreg[15][0] = (byte)0b11110001; charreg[15][1] = (byte)0b00000000; //F
+		charmap.put('F',15);
+	 	charreg[16][0] = (byte)0b10111101; charreg[16][1] = (byte)0b00000000; //G
+		charmap.put('G',16);
+	 	charreg[17][0] = (byte)0b11110110; charreg[17][1] = (byte)0b00000000; //H
+		charmap.put('H',17);
+	 	charreg[18][0] = (byte)0b00001001; charreg[18][1] = (byte)0b00010010; //I
+		charmap.put('I',18);
+	 	charreg[19][0] = (byte)0b00011110; charreg[19][1] = (byte)0b00000000; //J
+		charmap.put('J',19);
+	 	charreg[20][0] = (byte)0b01110000; charreg[20][1] = (byte)0b00001100; //K
+		charmap.put('K',20);
+	 	charreg[21][0] = (byte)0b00111000; charreg[21][1] = (byte)0b00000000; //L
+		charmap.put('L',21);
+	 	charreg[22][0] = (byte)0b00110110; charreg[22][1] = (byte)0b00000101; //M
+		charmap.put('M',22);
+	 	charreg[23][0] = (byte)0b00110110; charreg[23][1] = (byte)0b00001001; //N
+		charmap.put('N',23);
+	 	charreg[24][0] = (byte)0b00111111; charreg[24][1] = (byte)0b00000000; //O
+		charmap.put('O',24);
+	 	charreg[25][0] = (byte)0b11110011; charreg[25][1] = (byte)0b00000000; //P
+		charmap.put('P',25);
+	 	charreg[26][0] = (byte)0b00111111; charreg[26][1] = (byte)0b00001000; //Q
+		charmap.put('Q',26);
+	 	charreg[27][0] = (byte)0b11110011; charreg[27][1] = (byte)0b00001000; //R
+		charmap.put('R',27);
+	 	charreg[28][0] = (byte)0b10001101; charreg[28][1] = (byte)0b00000001; //S
+		charmap.put('S',28);
+	 	charreg[29][0] = (byte)0b00000001; charreg[29][1] = (byte)0b00010010; //T
+		charmap.put('T',29);
+	 	charreg[30][0] = (byte)0b00111110; charreg[30][1] = (byte)0b00000000; //U
+		charmap.put('U',30);
+	 	charreg[31][0] = (byte)0b00110000; charreg[31][1] = (byte)0b00100100; //V
+		charmap.put('V',31);
+	 	charreg[32][0] = (byte)0b00110110; charreg[32][1] = (byte)0b00101000; //W
+		charmap.put('W',32);
+	 	charreg[33][0] = (byte)0b00000000; charreg[33][1] = (byte)0b00101101; //X
+		charmap.put('X',33);
+	 	charreg[34][0] = (byte)0b00000000; charreg[34][1] = (byte)0b00010101; //Y
+		charmap.put('Y',34);
+	 	charreg[35][0] = (byte)0b00001001; charreg[35][1] = (byte)0b00100100; //Z
+		charmap.put('Z',35);
+		charreg[36][0] = (byte)0b00000000; charreg[36][1] = (byte)0b00000000; //space
+		charmap.put(' ',36);
+	}
+	
+	void display(String str) { // only displays first 4 chars
+		int[] charz = new int[4];
+		// uppercase and map it
+		str = repeat(' ',Math.max(0, 4-str.length())) + str.toUpperCase(); // pad it to 4 chars
+		
+		for (int i = 0; i < 4; i++) {
+			Integer g = (int) charmap.get(str.charAt(i));
+			if (g == null) {
+				g = 36;
+			}
+			charz[i] = g;
+		}
+		this._display(charz);
+	}
+	
+	void display(double batt) { // optimized for battery voltage, needs a double like 12.34
+		int[] charz = {36,36,36,36};
+		// idk how to decimal point
+		int ten = (int)(batt/10);
+		int one = (int)(batt%10);
+		int tenth = (int)((batt*10)%10);
+		int hundredth = (int)((batt*100)%10);
+		
+		if (ten != 0) charz[0] = ten;
+		charz[1] = one;
+		charz[2] = tenth;
+		charz[3] = hundredth;
+		
+		this._display(charz);
+	}
+	
+	 void clear() {
+		 int[] charz = {36,36,36,36}; // whyy java
+		 this._display(charz);
+	 }
+	 
+	 boolean getButtonA() {
+		 return buttonA.get();
+	 }
+	 boolean getButtonB() {
+		 return buttonB.get();
+	 }
+	 double getPot() {
+		 return pot.getVoltage();
+	 }
+	
+////// not supposed to be publicly used..
+	
+	void _display(int[] charz) {
+		byte[] byte1 = new byte[10];
+		byte1[0] = (byte)(0b0000111100001111);
+ 		byte1[2] = charreg[charz[3]][0];
+ 		byte1[3] = charreg[charz[3]][1];
+ 		byte1[4] = charreg[charz[2]][0];
+ 		byte1[5] = charreg[charz[2]][1];
+ 		byte1[6] = charreg[charz[1]][0];
+ 		byte1[7] = charreg[charz[1]][1];
+ 		byte1[8] = charreg[charz[0]][0];
+ 		byte1[9] = charreg[charz[0]][1];
+ 		//send the array to the board
+ 		i2c.writeBulk(byte1);
+ 		Timer.delay(0.01);
+	}
+	
+	String repeat(char c, int n) {
+	    char[] arr = new char[n];
+	    Arrays.fill(arr, c);
+	    return new String(arr);
+	}
+	
+}

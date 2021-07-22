@@ -1,0 +1,584 @@
+/*----------------------------------------------------------------------------*/
+/* Copyright (c) 2017-2018 FIRST. All Rights Reserved.                        */
+/* Open Source Software - may be modified and shared by FRC teams. The code   */
+/* must be accompanied by the FIRST BSD license file in the root directory of */
+/* the project.                                                               */
+/*----------------------------------------------------------------------------*/
+
+package frc.robot;
+
+import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+
+import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.wpilibj.CameraServer;
+import edu.wpi.first.wpilibj.Compressor;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.DoubleSolenoid;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.SpeedControllerGroup;
+import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.livewindow.LiveWindow;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
+/**
+ * The VM is configured to automatically run this class, and to call the
+ * functions corresponding to each mode, as described in the IterativeRobot
+ * documentation. If you change the name of this class or the package after
+ * creating this project, you must also update the build.gradle file in the
+ * project.
+ */
+public class Robot extends TimedRobot {
+
+  //Camera Server
+  CameraServer cs = CameraServer.getInstance();
+
+  //Joystick / Controller
+  Joystick X_Box = new Joystick(0);
+  Joystick Secondary = new Joystick(1);
+
+  //Line Break Sensor
+  DigitalInput Line_Break = new DigitalInput(0);
+
+  //Line Sensors
+  AnalogInput Line_Right = new AnalogInput(1);
+  AnalogInput Line_Middle = new AnalogInput(2);
+  AnalogInput Line_Left = new AnalogInput(0);
+
+  //(Depreciated)
+  //AnalogInput UltraSonic = new AnalogInput(3);
+
+  //Drive Motors
+  WPI_TalonSRX Front_Right = new WPI_TalonSRX(1);
+  WPI_TalonSRX Front_Left = new WPI_TalonSRX(6);
+  WPI_TalonSRX Back_Right = new WPI_TalonSRX(4);
+  WPI_TalonSRX Back_Left = new WPI_TalonSRX(5);
+
+  //Other Motor(s)
+  WPI_TalonSRX Lift = new WPI_TalonSRX(3);
+  WPI_TalonSRX Climb_Drive = new WPI_TalonSRX(0);
+  WPI_TalonSRX Climb_Assist = new WPI_TalonSRX(2);
+
+  //Solenoid(s)
+  DoubleSolenoid Ball_Claw = new DoubleSolenoid(1, 4, 5);
+  DoubleSolenoid Ball_Wrist = new DoubleSolenoid(1, 6, 7);
+  DoubleSolenoid Climbing = new DoubleSolenoid(0, 0, 1);
+
+  //(Depreciated)
+  //DoubleSolenoid Hatch = new DoubleSolenoid(1, 0, 1);
+  //DoubleSolenoid Hatch_Position = new DoubleSolenoid(1, 2, 3);
+
+  //Compressor
+  Compressor Compress = new Compressor();
+  
+  //Speed Controller Group(s)
+  SpeedControllerGroup Left_Motors = new SpeedControllerGroup(Front_Left, Back_Left);
+  SpeedControllerGroup Right_Motors = new SpeedControllerGroup(Front_Right, Back_Right);
+
+  //Robot Drive
+  DifferentialDrive Drive = new DifferentialDrive(Left_Motors, Right_Motors);
+
+  //
+  //Variables Start
+  //
+
+  //Auto Lift Variables
+  int Lift_Level = 0;
+  int Driver_Lift_Selection = 0;
+
+  //Line Sensor Max and Min Values
+  double left_max = 3.52;
+  double left_min = 0.53;
+  double middle_max = 4.10;
+  double middle_min = 0.63;
+  double right_max = 2.85;
+  double right_min = 0.36;
+
+  //Line Sensor Debug
+  double Debug_Left_Max = 0.0;
+  double Debug_Left_Min = 9.0;
+  double Debug_Middle_Max = 0.0;
+  double Debug_Middle_Min = 9.0;
+  double Debug_Right_Max = 0.0;
+  double Debug_Right_Min = 9.0;
+
+  //Sensor Values (Used Later In Code)
+  double left_value = 0.0;
+  double middle_value = 0.0;
+  double right_value = 0.0;
+
+  //LineSensor Function Variables
+  double left_speed = 0.0;
+  double right_speed = 0.0;
+  double p_speed;
+
+  //Button Release Booleans (Controller)
+  boolean X_Realease = true;
+  boolean Y_Release = true;
+  boolean A_Release = true;
+  boolean B_Release = true;
+  boolean RB_Release = true;
+  boolean LB_Release = true;
+
+  //Button Release Booleans (Joystick)
+  boolean Lift_Buttons_Release = true;
+  boolean Button_6_Release = true;
+  boolean Button_5_Release = true;
+  boolean Button_4_Release = true;
+  boolean Button_3_Release = true;
+  boolean Button_2_Release = true;
+  boolean Trigger_Release = true;
+
+  //Solenoid Booleans
+  boolean Hatch_Boolean = false;
+  boolean Hatch_Position_Boolean = false;
+  boolean Claw_Boolean = false;
+  boolean Wrist_Booelan = false;
+  boolean Climbing_Solenoid_Boolean = false;
+
+
+  //Climbing Toggle
+  boolean Climbing_Toggle = false;
+
+  //Manual Overrides
+  boolean Lift_Override = false;
+  boolean Claw_Manual_Override = false;
+
+  //Climb "Alarm"
+  boolean Climb_Time = false;
+
+  //Average Max / Min (Depreciated)
+  double sensor_min = 0.40;
+  double sensor_max = 1.82;
+
+  //Line Follower Booleans (Depreciated)
+  boolean left_turn;
+  boolean right_turn;
+
+  //
+  //Variables End
+  //
+
+  //Auto Sendable Chooser
+  private static final String kDefaultAuto = "Default";
+  private static final String kCustomAuto = "My Auto";
+  private String m_autoSelected;
+  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+
+  @Override
+  public void robotInit() {
+
+    //Axis Camera (current)
+    cs.addAxisCamera("host");
+
+    //Compressor Start
+    Compress.start();
+
+    //Temporary / Backup Camera
+   // CameraServer.getInstance().startAutomaticCapture();
+
+   //Auto Sendable Chooser (Init)
+   m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
+   m_chooser.addOption("My Auto", kCustomAuto);
+  // SmartDashboard.putData("Auto choices", m_chooser);
+  }
+
+  /**
+   * This function is called every robot packet, no matter the mode. Use
+   * this for items like diagnostics that you want ran during disabled,
+   * autonomous, teleoperated and test.
+   *
+   * <p>This runs after the mode specific periodic functions, but before
+   * LiveWindow and SmartDashboard integrated updating.
+   */
+  @Override
+  public void robotPeriodic() {
+
+    /////////////////////////////////Note: Add SmartDashBoard Outputs//////////////////////////////////
+
+    SmartDashboard.putNumber("Match Time", DriverStation.getInstance().getMatchTime());
+    SmartDashboard.putNumber("Battery Voltage", DriverStation.getInstance().getBatteryVoltage());
+    SmartDashboard.putBoolean("Claw Manual Override", Claw_Manual_Override);
+    SmartDashboard.putBoolean("CLIMB ALARM", Climb_Time);
+    
+    //Depreciated Inputs
+   // SmartDashboard.putBoolean("Lift Override", Lift_Override);
+   // SmartDashboard.putNumber("Driver Selection (Lift)", Driver_Lift_Selection);
+   // SmartDashboard.putNumber("Lift Level", Lift_Level);
+
+    //DEBUG SMARTDASHBOARD INPUTS
+   /* SmartDashboard.putNumber("Left Sensor", Line_Left.getAverageVoltage());
+    SmartDashboard.putNumber("Middle Sensor", Line_Middle.getAverageVoltage());
+    SmartDashboard.putNumber("Right Sensor", Line_Right.getAverageVoltage());
+    SmartDashboard.putNumber("UltraSonic", UltraSonic.getAverageVoltage());
+    SmartDashboard.putNumber("Left Max", left_max);
+    SmartDashboard.putNumber("Left Min", left_min);
+    SmartDashboard.putNumber("Middle Max", middle_max);
+    SmartDashboard.putNumber("Middle Min", middle_min);
+    SmartDashboard.putNumber("Right Max", right_max);
+    SmartDashboard.putNumber("Right Min", right_min);
+    */
+
+  }
+
+  /**
+   * This autonomous (along with the chooser code above) shows how to select
+   * between different autonomous modes using the dashboard. The sendable
+   * chooser code works with the Java SmartDashboard. If you prefer the
+   * LabVIEW Dashboard, remove all of the chooser code and uncomment the
+   * getString line to get the auto name from the text box below the Gyro
+   *
+   * <p>You can add additional auto modes by adding additional comparisons to
+   * the switch structure below with additional strings. If using the
+   * SendableChooser make sure to add them to the chooser code above as well.
+   */
+  @Override
+
+  //Unused Method
+  public void autonomousInit() {
+  }
+
+  @Override
+  //SandStorm Code
+  public void autonomousPeriodic() {
+
+    //Sandstorm Code (Teleop Method)
+    teleopPeriodic();
+  }
+
+  @Override
+  public void teleopPeriodic() {
+
+     // Get the proportional speed from the method
+     p_speed = proportional_speed();
+
+     //
+     //Auto Lift (Depreciated)
+     //
+     /*
+    //Auto Lift Selection
+    if(Secondary.getRawButton(5) && !Lift_Override && Lift_Buttons_Release && Driver_Lift_Selection != 2){
+      Driver_Lift_Selection++;
+      Lift_Buttons_Release = false;
+
+    }else if(Secondary.getRawButton(3) && Lift_Buttons_Release && !Lift_Override && Driver_Lift_Selection !=0){
+      Driver_Lift_Selection--;
+      Lift_Buttons_Release = false;
+
+    }else if(Secondary.getRawButton(5) == false && Secondary.getRawButton(3) == false){
+      Lift_Buttons_Release = true;
+
+    }
+
+    //Auto Lift Command
+    if(Driver_Lift_Selection > Lift_Level && !Lift_Override && Ball_Claw.get() != DoubleSolenoid.Value.kReverse){
+      Lift.set(1.0);
+
+    }else if (Driver_Lift_Selection < Lift_Level && !Lift_Override && Ball_Claw.get() != DoubleSolenoid.Value.kReverse){
+      Lift.set(-1.0);
+
+    }else if(Driver_Lift_Selection == Lift_Level && !Lift_Override){
+      Lift.set(0.0);
+    }
+
+    //Lift Override(Toggle)
+    if(Secondary.getRawButton(2) && Button_2_Release && !Lift_Override){
+      Lift_Override = true;
+      Button_2_Release = false;
+
+    }else if (Secondary.getRawButton(2) && Button_2_Release && Lift_Override){
+      Lift_Override = false;
+      Button_2_Release = false;
+
+    }else if(Secondary.getRawButton(2) == false){
+      Button_2_Release = true;
+    }
+
+    //Lift Override (Command)
+      if(Secondary.getRawButton(5) && Ball_Claw.get() != DoubleSolenoid.Value.kReverse && Lift_Override == true){
+        Lift.set(1.0);
+
+      }else if(Secondary.getRawButton(3) && Ball_Claw.get() != DoubleSolenoid.Value.kReverse && Lift_Override == true){
+        Lift.set(-1.0);
+
+      }else if (Secondary.getRawButton(5) == false && X_Box.getRawButton(3) == false && Lift_Override == true){
+        Lift.set(0.0);
+      }
+*/
+
+//
+//Current Lift
+//
+if(Secondary.getRawButton(5) && Claw_Boolean){
+  Lift.set(1.0);
+}else if (Secondary.getRawButton(3)){
+  Lift.set(-1.0);
+}else{
+  Lift.set(0.0);
+}
+
+    //
+    //Solenoid Commands
+    //
+
+    //
+    //Auto Cargo Intake
+    //
+
+  //Maual Override Selection
+  if(Secondary.getRawButton(2) && !Claw_Manual_Override){
+    Claw_Manual_Override = true;
+    Button_2_Release = false;
+
+  }else if (Secondary.getRawButton(2) && Claw_Manual_Override){
+    Claw_Manual_Override = false;
+    Button_2_Release = false;
+  }else{
+    Button_2_Release = true;
+  }
+
+  //Claw Commands
+  if(Claw_Manual_Override == false){
+
+    if(Line_Break.get() == false){
+      Ball_Claw.set(DoubleSolenoid.Value.kForward);
+    }else if(Line_Break.get() == true){
+      Ball_Claw.set(DoubleSolenoid.Value.kReverse);
+    }
+
+  }else if(Claw_Manual_Override == true){
+    //
+    //Cargo Intake manual override
+    //
+    if(X_Box.getRawButton(1) && A_Release && Claw_Boolean){
+      Ball_Claw.set(DoubleSolenoid.Value.kForward);
+      A_Release = false;
+      Claw_Boolean = false;
+
+    }else if(X_Box.getRawButton(1) && A_Release && !Claw_Boolean){
+      Ball_Claw.set(DoubleSolenoid.Value.kReverse);
+      A_Release = false;
+      Claw_Boolean = true;
+
+    }else if (X_Box.getRawButton(1) == false){
+      Ball_Claw.set(DoubleSolenoid.Value.kOff);
+      A_Release = true;
+    }
+  }
+  //
+  //End of Claw Commands
+  //
+
+    //Wrist Action (For the frame perimeter)
+    if(Secondary.getRawButton(4) && Button_4_Release == true && !Wrist_Booelan){
+      Ball_Wrist.set(DoubleSolenoid.Value.kForward);
+      Button_4_Release = false;
+      Wrist_Booelan = true;
+
+    }else if(Secondary.getRawButton(4) && Button_4_Release == true && Wrist_Booelan){
+      Ball_Wrist.set(DoubleSolenoid.Value.kReverse);
+      Wrist_Booelan = false;
+      Button_4_Release = false;
+
+    }else if(Secondary.getRawButton(4) == false){
+      Ball_Wrist.set(DoubleSolenoid.Value.kOff);
+      Button_4_Release = true;
+    }
+
+    //Climbing Solenoid Command
+    if(X_Box.getRawButton(5) && LB_Release && !Climbing_Solenoid_Boolean){
+      Climbing.set(DoubleSolenoid.Value.kForward);
+      Climbing_Solenoid_Boolean = true;
+      LB_Release = false;
+
+    }else if (X_Box.getRawButton(5) && LB_Release && Climbing_Solenoid_Boolean){
+      Climbing.set(DoubleSolenoid.Value.kReverse);
+      Climbing_Solenoid_Boolean = false;
+      LB_Release = false;
+
+    }else if (X_Box.getRawButton(5) == false){
+      Climbing.set(DoubleSolenoid.Value.kOff);
+      LB_Release = true;
+    }
+
+
+    //
+    //Driving Command(s)
+    //
+
+     // If You Press The Button The Robot Drives Based On Its Position On The Line
+     if (X_Box.getRawButton(3) == true) {
+ 
+       // if line is on left sensor drive left
+       if(left_value > right_value && left_value > middle_value){
+       left_speed = (0.25 * (1 + p_speed));
+       right_speed = (0.25* (1 - p_speed));
+       Drive.tankDrive(-left_speed, -right_speed);
+       }
+ 
+       // if line is on middle sensor drive forward      
+       else if (middle_value > right_value && middle_value > left_value){
+        Drive.tankDrive(-0.25, -0.25);
+       }
+ 
+       // if line is on right sensor
+       else if(right_value > middle_value && right_value > middle_value){        
+         left_speed = (0.25 * (1 - p_speed));
+         right_speed = (0.25 * (1 + p_speed));
+         Drive.tankDrive(-left_speed, -right_speed);
+       }
+     }else if (X_Box.getRawButton(3) == false){
+
+       //Defualt Drive Function (Nested if Statement)
+         if(X_Box.getRawAxis(3) > 0.2){
+           Drive.arcadeDrive(X_Box.getRawAxis(3) * 0.8, X_Box.getRawAxis(0) * 0.9);
+         }else if(X_Box.getRawAxis(2) > 0.2 && X_Box.getRawAxis(3) < 0.2){
+           Drive.arcadeDrive(-X_Box.getRawAxis(2) * 0.8, X_Box.getRawAxis(0) * 0.9);
+         }else{
+         Drive.arcadeDrive(0.0, X_Box.getRawAxis(0));
+       } 
+//
+//End of Driving Commands
+//
+      }
+
+       //Climb Assist Motor
+       if(Secondary.getRawButton(12)){
+         Climb_Assist.set(1.0); 
+       }else if(Secondary.getRawButton(11)){
+         Climb_Assist.set(-1.0);
+       }else{
+         Climb_Assist.set(0.0);
+       }
+
+       //Climb Drive Toggle
+       if(X_Box.getRawButton(6) && RB_Release && !Climbing_Toggle){
+         Climbing_Toggle = true;
+         RB_Release = false;
+       }else if (X_Box.getRawButton(6) && RB_Release && Climbing_Toggle){
+         Climbing_Toggle = false;
+         RB_Release = false;
+       }else if (X_Box.getRawButton(6) == false){
+         RB_Release = true;
+       }
+
+       //Climbing Command
+       if(Climbing_Toggle == true){
+         Climb_Drive.set(1.0);
+       }else{
+         Climb_Drive.set(0.0);
+       }
+       
+       //Climb Alarm
+       if(DriverStation.getInstance().getMatchTime() < 35 && Climb_Time == false){
+         Climb_Time = true;
+       }else if (DriverStation.getInstance().getMatchTime() < 35 && Climb_Time == true){
+         Climb_Time = false;
+       }
+
+       //
+       //Teleop End
+       //
+  }
+
+  /**
+   * This function is called periodically during test mode.
+   */
+  @Override
+  public void testPeriodic() {
+
+    //Motor Inputs
+    LiveWindow.add(Front_Left);
+    LiveWindow.add(Front_Right);
+    LiveWindow.add(Back_Left);
+    LiveWindow.add(Back_Right);
+    LiveWindow.add(Climb_Assist);
+    LiveWindow.add(Lift);
+    LiveWindow.add(Climb_Drive);
+
+    //
+    // Line Sensor Debug
+    //
+
+    //Max Debug Variables
+    if(Line_Left.getAverageVoltage() > left_max){
+      left_max = Line_Left.getAverageVoltage();
+    }
+
+    if(Line_Middle.getAverageVoltage() > middle_max){
+      middle_max = Line_Middle.getAverageVoltage();
+    }
+
+    if(Line_Right.getAverageVoltage() > right_max){
+      right_max = Line_Right.getAverageVoltage();
+    }
+
+   //Min Debug Variables 
+    if(Line_Left.getAverageVoltage() < left_min){
+      left_min = Line_Left.getAverageVoltage();
+    }
+
+    if(Line_Middle.getAverageVoltage() < middle_min){
+      middle_min = Line_Middle.getAverageVoltage();
+    }
+
+    if(Line_Right.getAverageVoltage() < right_min){
+      right_min = Line_Right.getAverageVoltage();
+    }
+
+  }
+  //
+  /////Line Follower Function (Private Function)
+  //
+  double proportional_speed() {
+
+    //Largest Sensor Values & Final Value
+    double first_value = 0.0;
+    double second_value = 0.0;
+    double final_value = 0.0;
+
+    //Middle Boolean
+    boolean middle = false;
+
+
+    // Calculate the scaled value of each line sensor between 0 and 1
+    left_value = (Line_Left.getAverageVoltage() - left_min) / (left_max - left_min);
+    middle_value = (Line_Middle.getAverageVoltage() - middle_min) / (middle_max - middle_min);
+    right_value = (Line_Right.getAverageVoltage() - right_min) / (right_max - right_min);
+
+    // Determine the largest value between the three sensors
+    if (left_value > middle_value && left_value > right_value) {
+      first_value = left_value;
+      middle = false;
+    } else if (middle_value > left_value && middle_value > right_value) {
+      first_value = middle_value;
+      middle = true;
+    } else if (right_value > left_value && right_value > middle_value) {
+      first_value = right_value;
+      middle = false;
+    }
+
+    // If the largest value was middle, see if the left value or right value is larger.
+    // If the largest value was not middle. Set the second value to the middle value.
+    if (middle) {
+      // second_value = (left_value > right_value) ? left_value : right_value;
+      if(left_value > right_value){
+        second_value = left_value;
+      } else {
+        second_value = right_value;
+      }
+    } else{
+     second_value = middle_value;
+    }
+
+    // Calculate the final value
+    final_value = (first_value - second_value) / (first_value + second_value);
+
+    //Final Value to add to motors
+    final_value = final_value * 2;
+    
+    return final_value;
+  }
+}
