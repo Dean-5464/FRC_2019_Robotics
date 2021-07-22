@@ -1,0 +1,9 @@
+[
+  {
+    "artifact": "frcJava (in project Break_Beam_Sensor-Imported)",
+    "target": "roborio",
+    "debugfile": "frcJava_roborio.debugconfig",
+    "project": "Break_Beam_Sensor-Imported",
+    "language": "java"
+  }
+]
