@@ -1,0 +1,9 @@
+[
+  {
+    "artifact": "frcJava (in project Fundraising_Code_FrankenBot)",
+    "target": "roborio",
+    "debugfile": "frcJava_roborio.debugconfig",
+    "project": "Fundraising_Code_FrankenBot",
+    "language": "java"
+  }
+]
